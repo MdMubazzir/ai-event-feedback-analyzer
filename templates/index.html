@@ -1,0 +1,238 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRESEVENT Feedback Portal</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f8; color:#333; line-height:1.6; }
+a { text-decoration:none; color:#3066be; }
+button { cursor:pointer; transition: 0.2s; }
+
+.container { max-width: 900px; margin: auto; padding: 30px; }
+.card { background: #fff; border-radius: 12px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+h2 { margin-bottom: 15px; color: #119da4; }
+h3 { margin-top: 20px; color:#3066be; }
+
+.btn { padding: 10px 20px; border-radius: 6px; border: none; background: #3066be; color: #fff; font-weight: bold; margin-top: 10px; }
+.btn:hover { background: #119da4; }
+input, textarea { width: 100%; padding: 12px; margin-top: 8px; margin-bottom: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
+textarea { resize: vertical; min-height: 100px; }
+#eventList li { list-style: none; margin: 10px 0; padding: 10px 15px; background: #e1f5fe; border-radius: 8px; transition: 0.2s; }
+#eventList li:hover { background: #b3e5fc; }
+.hidden { display: none; }
+.admin-btn { background: #119da4; margin-top: 5px; }
+.admin-btn:hover { background: #3066be; }
+
+.spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3066be; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite; display: inline-block; margin-left: 8px; vertical-align: middle; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+@media (max-width: 600px) { .container { padding: 15px; } .btn { width: 100%; } input, textarea { font-size: 14px; } }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <!-- PUBLIC EVENTS -->
+    <div id="public" class="card">
+        <h2>🎉 Upcoming Campus Events</h2>
+        <p>Welcome to CRESEVENT! Share your feedback to help us improve every experience.</p>
+        <ul id="eventList"></ul>
+        <button class="btn" onclick="showAdmin()">Admin Login</button>
+    </div>
+
+    <!-- FEEDBACK -->
+    <div id="feedback" class="card hidden">
+        <h2 id="eventTitle"></h2>
+        <textarea id="feedbackText" placeholder="Share your thoughts here..."></textarea>
+        <button class="btn" onclick="sendFeedback()">Submit Feedback</button>
+        <p id="msg" style="margin-top:8px; color:green;"></p>
+        <button class="btn admin-btn" onclick="home()">Back to Events</button>
+    </div>
+
+    <!-- ADMIN LOGIN -->
+    <div id="adminLogin" class="card hidden">
+        <h2>🔐 Admin Access</h2>
+        <p>Enter your secure password to manage events.</p>
+        <input type="password" id="adminPass" placeholder="Admin password">
+        <button class="btn" onclick="login()">Login</button>
+        <p id="loginMsg" style="margin-top:8px; color:red;"></p>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <div id="adminPanel" class="card hidden">
+        <h2>🧑‍💼 Admin Dashboard</h2>
+        <input id="newEvent" placeholder="Create New Event">
+        <button class="btn" onclick="addEvent()">Add Event</button>
+
+        <hr style="margin:20px 0;">
+        <div id="adminEvents"></div>
+        <button class="btn admin-btn" onclick="home()">Logout</button>
+    </div>
+
+</div>
+
+<script>
+let events = [];
+let currentEvent = "";
+let adminPassword = "";
+
+// ---------------- LOAD EVENTS ----------------
+async function loadEvents(){
+    const res = await fetch("/events");
+    events = await res.json();
+    const list = document.getElementById("eventList");
+    list.innerHTML = "";
+    if(events.length === 0){
+        list.innerHTML = "<li>No events available yet.</li>";
+    } else {
+        events.forEach(ev => {
+            list.innerHTML += `<li><a href="#" onclick="openFeedback('${ev}')">${ev}</a></li>`;
+        });
+    }
+}
+
+// ---------------- FEEDBACK ----------------
+function openFeedback(ev){
+    currentEvent = ev;
+    document.getElementById("public").classList.add("hidden");
+    document.getElementById("feedback").classList.remove("hidden");
+    document.getElementById("eventTitle").innerText = ev;
+}
+
+async function sendFeedback(){
+    const feedback = document.getElementById("feedbackText").value;
+    if(!feedback) return;
+    await fetch("/submit_feedback", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({event: currentEvent, feedback})
+    });
+    document.getElementById("msg").innerText = "Feedback submitted! Thank you.";
+    document.getElementById("feedbackText").value = "";
+}
+
+// ---------------- ADMIN ----------------
+function showAdmin(){
+    document.getElementById("public").classList.add("hidden");
+    document.getElementById("adminLogin").classList.remove("hidden");
+}
+
+function login(){
+    const password = document.getElementById("adminPass").value;
+    if(!password) return;
+    adminPassword = password;
+    document.getElementById("adminLogin").classList.add("hidden");
+    document.getElementById("adminPanel").classList.remove("hidden");
+    loadAdmin();
+}
+
+// ---------------- ADMIN DASHBOARD ----------------
+async function loadAdmin(){
+    const container = document.getElementById("adminEvents");
+    container.innerHTML = "";
+
+    // ---------------- Compute Top 3 Popular Events ----------------
+    let popularityList = [];
+    for(let ev of events){
+        const feedbackRes = await fetch("/analyze", {
+            method:"POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({event: ev, password: adminPassword})
+        });
+        const data = await feedbackRes.json();
+        popularityList.push({event: ev, percent: data.percent_positive || 0});
+    }
+    popularityList.sort((a,b)=>b.percent - a.percent);
+    const top3 = popularityList.slice(0,3);
+
+    if(top3.length > 0){
+        let html = "<h3>🏆 Top 3 Popular Events</h3><ul>";
+        top3.forEach(ev => html += `<li>${ev.event}: ${ev.percent}% positive feedback</li>`);
+        html += "</ul><hr>";
+        container.innerHTML += html;
+    }
+
+    // ---------------- All Events ----------------
+    events.forEach(ev => {
+        container.innerHTML += `
+            <p>
+                <b>${ev}</b>
+                <button class="btn admin-btn" onclick="analyze('${ev}', this)">Analyze Feedback</button>
+                <button class="btn admin-btn" onclick="deleteEvent('${ev}')">Delete</button>
+            </p>
+            <div id="res_${ev}" style="margin-top:10px;"></div>
+            <hr>
+        `;
+    });
+}
+
+// ---------------- ANALYZE ----------------
+async function analyze(ev, btn){
+    if(!adminPassword) return alert("Admin not logged in!");
+    const spinner = document.createElement("span");
+    spinner.className = "spinner";
+    btn.appendChild(spinner);
+
+    const res = await fetch("/analyze", {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({event: ev, password: adminPassword})
+    });
+    const data = await res.json();
+    btn.removeChild(spinner);
+
+    if(data.error){
+        alert(data.error);
+        return;
+    }
+
+    document.getElementById(`res_${ev}`).innerHTML = `
+        <p><b>Summary:</b> ${data.summary}</p>
+        <p><b>Positive Feedback:</b> ${data.likes}</p>
+        <p><b>Negative Feedback:</b> ${data.dislikes}</p>
+        <p><b>Example Positive:</b> ${data.positive_example}</p>
+        <p><b>Example Negative:</b> ${data.negative_example}</p>
+        <p><b>Positive Percentage:</b> ${data.percent_positive}%</p>
+    `;
+}
+
+// ---------------- ADD / DELETE EVENT ----------------
+async function addEvent(){
+    const name = document.getElementById("newEvent").value;
+    if(!name) return;
+    await fetch("/add_event", {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({event: name})
+    });
+    document.getElementById("newEvent").value = "";
+    await loadEvents();
+    loadAdmin();
+}
+
+async function deleteEvent(ev){
+    if(!confirm(`Are you sure you want to delete "${ev}"?`)) return;
+    await fetch("/delete_event", {
+        method:"POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({event: ev})
+    });
+    await loadEvents();
+    loadAdmin();
+}
+
+// ---------------- HOME ----------------
+function home(){ location.reload(); }
+
+// ---------------- INITIAL LOAD ----------------
+loadEvents();
+</script>
+
+</body>
+</html>
+
+
