@@ -36,15 +36,15 @@ textarea { resize: vertical; min-height: 100px; }
 
 <div class="container">
 
-    <!-- PUBLIC EVENTS -->
+
     <div id="public" class="card">
-        <h2>🎉 Upcoming Campus Events</h2>
+        <h2>Upcoming Campus Events</h2>
         <p>Welcome to CRESEVENT! Share your feedback to help us improve every experience.</p>
         <ul id="eventList"></ul>
         <button class="btn" onclick="showAdmin()">Admin Login</button>
     </div>
 
-    <!-- FEEDBACK -->
+
     <div id="feedback" class="card hidden">
         <h2 id="eventTitle"></h2>
         <textarea id="feedbackText" placeholder="Share your thoughts here..."></textarea>
@@ -53,18 +53,18 @@ textarea { resize: vertical; min-height: 100px; }
         <button class="btn admin-btn" onclick="home()">Back to Events</button>
     </div>
 
-    <!-- ADMIN LOGIN -->
+
     <div id="adminLogin" class="card hidden">
-        <h2>🔐 Admin Access</h2>
+        <h2>Admin Access</h2>
         <p>Enter your secure password to manage events.</p>
         <input type="password" id="adminPass" placeholder="Admin password">
         <button class="btn" onclick="login()">Login</button>
         <p id="loginMsg" style="margin-top:8px; color:red;"></p>
     </div>
 
-    <!-- ADMIN PANEL -->
+
     <div id="adminPanel" class="card hidden">
-        <h2>🧑‍💼 Admin Dashboard</h2>
+        <h2>Admin Dashboard</h2>
         <input id="newEvent" placeholder="Create New Event">
         <button class="btn" onclick="addEvent()">Add Event</button>
 
@@ -80,7 +80,7 @@ let events = [];
 let currentEvent = "";
 let adminPassword = "";
 
-// ---------------- LOAD EVENTS ----------------
+
 async function loadEvents(){
     const res = await fetch("/events");
     events = await res.json();
@@ -95,7 +95,7 @@ async function loadEvents(){
     }
 }
 
-// ---------------- FEEDBACK ----------------
+
 function openFeedback(ev){
     currentEvent = ev;
     document.getElementById("public").classList.add("hidden");
@@ -115,7 +115,7 @@ async function sendFeedback(){
     document.getElementById("feedbackText").value = "";
 }
 
-// ---------------- ADMIN ----------------
+
 function showAdmin(){
     document.getElementById("public").classList.add("hidden");
     document.getElementById("adminLogin").classList.remove("hidden");
@@ -130,12 +130,11 @@ function login(){
     loadAdmin();
 }
 
-// ---------------- ADMIN DASHBOARD ----------------
+
 async function loadAdmin(){
     const container = document.getElementById("adminEvents");
     container.innerHTML = "";
 
-    // ---------------- Compute Top 3 Popular Events ----------------
     let popularityList = [];
     for(let ev of events){
         const feedbackRes = await fetch("/analyze", {
@@ -150,13 +149,13 @@ async function loadAdmin(){
     const top3 = popularityList.slice(0,3);
 
     if(top3.length > 0){
-        let html = "<h3>🏆 Top 3 Popular Events</h3><ul>";
+        let html = "<h3>Top 3 Popular Events</h3><ul>";
         top3.forEach(ev => html += `<li>${ev.event}: ${ev.percent}% positive feedback</li>`);
         html += "</ul><hr>";
         container.innerHTML += html;
     }
 
-    // ---------------- All Events ----------------
+
     events.forEach(ev => {
         container.innerHTML += `
             <p>
@@ -170,7 +169,7 @@ async function loadAdmin(){
     });
 }
 
-// ---------------- ANALYZE ----------------
+
 async function analyze(ev, btn){
     if(!adminPassword) return alert("Admin not logged in!");
     const spinner = document.createElement("span");
@@ -200,7 +199,6 @@ async function analyze(ev, btn){
     `;
 }
 
-// ---------------- ADD / DELETE EVENT ----------------
 async function addEvent(){
     const name = document.getElementById("newEvent").value;
     if(!name) return;
@@ -225,10 +223,8 @@ async function deleteEvent(ev){
     loadAdmin();
 }
 
-// ---------------- HOME ----------------
 function home(){ location.reload(); }
 
-// ---------------- INITIAL LOAD ----------------
 loadEvents();
 </script>
 
